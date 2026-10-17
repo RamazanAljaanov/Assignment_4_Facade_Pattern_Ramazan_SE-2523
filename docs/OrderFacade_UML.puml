@@ -1,0 +1,135 @@
+@startuml OrderProcessingFacade
+
+title Online Order Processing Facade
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+hide empty members
+
+package "Assignment4" {
+  class Main {
+    + main(args): void
+  }
+}
+
+package "Assignment4.client" {
+  class OrderClient {
+    - orderFacade: OrderFacade
+    + demonstrateOrderProcessing(): void
+  }
+}
+
+package "Assignment4.facade" {
+  class OrderFacade {
+    - inventoryService: InventoryService
+    - paymentProcessor: PaymentProcessor
+    - shippingService: ShippingService
+    - notificationService: NotificationService
+    + placeOrder(cart: Cart, customer: Customer): Order
+  }
+}
+
+package "Assignment4.model" {
+  class Cart {
+    - items: List<Cart.Item>
+    + addItem(...): void
+    + getTotal(): BigDecimal
+    + isEmpty(): boolean
+  }
+
+  class "Cart.Item" as CartItem <<record>> {
+    + productId: String
+    + productName: String
+    + quantity: int
+    + unitPrice: BigDecimal
+  }
+
+  class Customer {
+    - id: String
+    - name: String
+    - shippingAddress: String
+    - paymentApproved: boolean
+    + getShippingAddress(): String
+    + isPaymentApproved(): boolean
+  }
+
+  class Order {
+    - orderId: String
+    - customer: Customer
+    - total: BigDecimal
+    - status: OrderStatus
+    - trackingNumber: String
+    - failureReason: String
+    + markPaid(): void
+    + markShipped(trackingNumber): void
+    + markFailed(reason): void
+  }
+
+  enum OrderStatus {
+    CREATED
+    PAID
+    SHIPPED
+    FAILED
+  }
+}
+
+package "Assignment4.subsystem" {
+  class InventoryService {
+    - availableStock: Map<String, Integer>
+    + reserveItems(cart: Cart): void
+    + releaseItems(cart: Cart): void
+  }
+
+  class PaymentProcessor {
+    + charge(customer: Customer, amount: BigDecimal): boolean
+  }
+
+  class ShippingService {
+    - shipments: Map<String, Shipment>
+    + createShipment(order: Order): String
+    + getShipment(trackingNumber): Shipment
+  }
+
+  class "ShippingService.Shipment" as Shipment <<record>> {
+    + orderId: String
+    + shippingAddress: String
+    + trackingNumber: String
+  }
+
+  class NotificationService {
+    + sendConfirmation(order: Order): void
+  }
+}
+
+Main ..> OrderClient : starts demo
+Main ..> OrderFacade : creates
+OrderClient --> OrderFacade : calls placeOrder()
+OrderClient ..> Cart : builds demo cart
+OrderClient ..> Customer : builds demo customer
+OrderClient ..> Order : displays result
+
+OrderFacade ..> Cart : accepts
+OrderFacade ..> Customer : accepts
+OrderFacade ..> Order : returns
+OrderFacade --> InventoryService : reserve / release
+OrderFacade --> PaymentProcessor : charge
+OrderFacade --> ShippingService : create shipment
+OrderFacade --> NotificationService : send confirmation
+
+Cart *-- "0..*" CartItem : contains
+Order --> Customer : belongs to
+Order --> OrderStatus : has status
+ShippingService *-- Shipment : stores
+
+note right of OrderFacade
+  If payment is declined after stock reservation:
+  releaseItems(cart) restores the reserved stock,
+  then the order is marked FAILED.
+end note
+
+note bottom of InventoryService
+  Subsystem classes have no reference back to OrderFacade
+  and can be used directly by advanced clients.
+end note
+
+@enduml
